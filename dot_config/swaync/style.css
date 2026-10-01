@@ -1,0 +1,174 @@
+:root {
+  --cc-bg: rgba(26, 27, 38, 0.97);
+  --noti-border-color: rgba(122, 162, 247, 0.38);
+  --noti-bg: 36, 40, 59;
+  --noti-bg-alpha: 0.96;
+  --noti-bg-darker: rgb(26, 27, 38);
+  --noti-bg-hover: rgb(41, 46, 66);
+  --noti-bg-focus: rgba(65, 72, 104, 0.75);
+  --noti-close-bg: rgba(65, 72, 104, 0.8);
+  --noti-close-bg-hover: rgb(247, 118, 142);
+  --text-color: rgb(192, 202, 245);
+  --text-color-disabled: rgb(86, 95, 137);
+  --bg-selected: rgb(122, 162, 247);
+  --notification-icon-size: 56px;
+  --notification-app-icon-size: 24px;
+  --notification-group-icon-size: 28px;
+  --border: 1px solid var(--noti-border-color);
+  --border-radius: 12px;
+  --notification-shadow: 0 6px 24px rgba(0, 0, 0, 0.38);
+  --font-size-body: 14px;
+  --font-size-summary: 15px;
+}
+
+* {
+  font-family: "Noto Sans", sans-serif;
+}
+
+notificationwindow,
+blankwindow {
+  background: transparent;
+}
+
+.control-center {
+  color: var(--text-color);
+  background: var(--cc-bg);
+  border: var(--border);
+  border-radius: var(--border-radius);
+}
+
+.notification-row {
+  background: transparent;
+  outline: none;
+}
+
+.notification-row .notification-background {
+  padding: 5px 9px;
+}
+
+.notification-row .notification-background .notification {
+  color: var(--text-color);
+  background: rgba(var(--noti-bg), var(--noti-bg-alpha));
+  border: var(--border);
+  border-radius: var(--border-radius);
+}
+
+.notification-row .notification-background .notification.critical {
+  border-color: rgb(247, 118, 142);
+}
+
+.notification-default-action,
+.notification-action {
+  color: var(--text-color);
+  background: transparent;
+  border-radius: var(--border-radius);
+}
+
+.notification-default-action:hover,
+.notification-action:hover {
+  background: var(--noti-bg-hover);
+}
+
+.summary {
+  color: #c0caf5;
+  font-weight: 700;
+}
+
+.body,
+.time {
+  color: #a9b1d6;
+}
+
+.close-button {
+  color: var(--text-color);
+  background: var(--noti-close-bg);
+  border: none;
+  border-radius: 999px;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.close-button:hover {
+  color: #1a1b26;
+  background: var(--noti-close-bg-hover);
+}
+
+.control-center-list,
+.notification-group {
+  background: transparent;
+}
+
+.widget-title,
+.widget-dnd,
+.widget-inhibitors {
+  color: var(--text-color);
+  background: #24283b;
+  margin: 8px;
+  padding: 10px;
+  border-radius: 10px;
+}
+
+.widget-title button,
+.widget-inhibitors button {
+  color: #1a1b26;
+  background: #7aa2f7;
+  border: none;
+  border-radius: 8px;
+}
+
+/* Control-center widgets: keep the same Tokyo Night glass language as the
+ * notification cards, while leaving the actual slider/button states clear. */
+.widget-buttons-grid,
+.widget-volume,
+.widget-mpris {
+  color: var(--text-color);
+  background: rgba(36, 40, 59, 0.72);
+  border: var(--border);
+  border-radius: var(--border-radius);
+  margin: 8px;
+  padding: 8px;
+}
+
+.widget-buttons-grid flowboxchild > button {
+  color: var(--text-color);
+  background: rgba(41, 46, 66, 0.86);
+  border: 1px solid rgba(122, 162, 247, 0.28);
+  border-radius: 9px;
+  min-height: 38px;
+}
+
+.widget-buttons-grid flowboxchild > button:hover {
+  background: rgba(65, 72, 104, 0.92);
+}
+
+.widget-buttons-grid flowboxchild > button.toggle:checked {
+  color: #1a1b26;
+  background: #7aa2f7;
+  border-color: #7aa2f7;
+}
+
+.widget-volume scale trough,
+.widget-mpris scale trough {
+  background: rgba(22, 22, 30, 0.78);
+  border: 1px solid rgba(65, 72, 104, 0.9);
+  border-radius: 999px;
+}
+
+.widget-volume scale highlight,
+.widget-mpris scale highlight {
+  background: #7aa2f7;
+  border-radius: 999px;
+}
+
+.widget-volume scale slider,
+.widget-mpris scale slider {
+  background: #c0caf5;
+  border: 2px solid #7aa2f7;
+  border-radius: 999px;
+  min-width: 12px;
+  min-height: 12px;
+}
+
+.widget-mpris .widget-mpris-player {
+  background: transparent;
+}

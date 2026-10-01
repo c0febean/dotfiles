@@ -1,0 +1,15 @@
+# chezmoi-generated or local-only material
+.chezmoi.toml
+.chezmoi.yaml
+.chezmoi.json
+.chezmoi.local.*
+
+# Private local manifests are intentionally outside the shared history.
+packages/private/
+private/
+
+# Editor and OS noise
+.DS_Store
+*.swp
+*.swo
+*~

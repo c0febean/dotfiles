@@ -1,0 +1,97 @@
+/* Compact Tokyo-Night application launcher, built for this Hyprland setup. */
+* {
+    background:       #1a1b26;
+    surface:          #24283b;
+    hover:            #292e42;
+    foreground:       #c0caf5;
+    muted:            #a9b1d6;
+    accent:           #7aa2f7;
+    secondary-accent: #bb9af7;
+
+    background-color: transparent;
+    text-color:       @foreground;
+    font:             "Noto Sans 11";
+}
+
+window {
+    location:         center;
+    anchor:           center;
+    width:            35%;
+    background-color: @background;
+    border:           1px;
+    border-color:     @hover;
+    border-radius:    8px;
+    padding:          12px;
+}
+
+mainbox {
+    children:         [ inputbar, message, listview ];
+    spacing:          10px;
+    background-color: transparent;
+}
+
+inputbar {
+    children:         [ prompt, entry ];
+    spacing:          10px;
+    padding:          10px 12px;
+    background-color: @surface;
+    border:           1px;
+    border-color:     @hover;
+    border-radius:    8px;
+}
+
+prompt {
+    text-color:       @secondary-accent;
+}
+
+entry {
+    placeholder:       "Type to search or use a prefix…";
+    placeholder-color: @muted;
+    text-color:        @foreground;
+    cursor-color:      @accent;
+}
+
+message {
+    padding:          0px 2px;
+    background-color: transparent;
+}
+
+textbox {
+    text-color:       @muted;
+    background-color: transparent;
+}
+
+listview {
+    lines:            7;
+    columns:          1;
+    fixed-columns:    true;
+    fixed-height:     true;
+    spacing:          4px;
+    scrollbar:        false;
+    background-color: transparent;
+}
+
+element {
+    children:         [ element-icon, element-text ];
+    orientation:      horizontal;
+    spacing:          10px;
+    padding:          7px 9px;
+    background-color: transparent;
+    border-radius:    6px;
+}
+
+element-icon {
+    size:             28px;
+    background-color: inherit;
+}
+
+element-text {
+    vertical-align:   0.5;
+    background-color: inherit;
+    text-color:       inherit;
+}
+
+element selected {
+    background-color: @accent;
+    text-color:       @background;
+}

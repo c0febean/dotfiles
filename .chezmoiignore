@@ -1,0 +1,30 @@
+# Repository-only documentation and manifests.
+*.md
+.gitignore
+docs/
+packages/
+private/
+
+# Empty workspace folders that are not part of the home directory state.
+.agents/
+.aws/
+.codex/
+
+# The current host is the only host with the graphical desktop layer.
+# Terminal-only machines receive the shell/tooling layer but no Hyprland stack.
+{{- if ne .chezmoi.hostname .host.desktop_hostname }}
+.config/hypr/
+.config/waybar/
+.config/rofi/
+.config/swaync/
+.config/kitty/
+.config/fcitx5/
+.config/qt6ct/
+.config/xsettingsd/
+.config/environment.d/
+.config/gtk-3.0/
+.config/gtk-4.0/
+.config/nwg-look/
+.gtkrc-2.0
+.local/bin/rofi-launcher
+{{- end }}

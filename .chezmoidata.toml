@@ -1,0 +1,12 @@
+# Non-secret repository data. Host selection is consumed by .chezmoiignore so
+# terminal hosts do not receive the graphical layer.
+
+[host]
+desktop_hostname = "ghost"
+
+[tooling]
+common_manifest = "packages/arch/common.txt"
+terminal_manifest = "packages/arch/terminal-enhanced.txt"
+development_manifest = "packages/arch/development.txt"
+desktop_manifest = "packages/arch/ghost-desktop.txt"
+private_manifest = "packages/private/tools.txt"

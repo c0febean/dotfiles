@@ -1,0 +1,10 @@
+# Copy this file to packages/private/tools.txt locally if you want a private
+# per-user/per-machine tool manifest. The destination is gitignored.
+#
+# Examples:
+# remmina
+# a work-only VPN/client
+# a private cloud or vendor CLI
+#
+# Keep credentials, tokens, proxy subscriptions, SSH keys, and account data
+# outside this file and outside the shared dotfiles repository.

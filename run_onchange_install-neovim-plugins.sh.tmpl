@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+set -eu
+
+# Re-run when the Neovim configuration changes.
+# init:    {{ include "dot_config/nvim/init.lua" | sha256sum }}
+# options: {{ include "dot_config/nvim/lua/options.lua" | sha256sum }}
+# keymaps: {{ include "dot_config/nvim/lua/keymaps.lua" | sha256sum }}
+# plugins: {{ include "dot_config/nvim/lua/plugins.lua" | sha256sum }}
+# lsp:     {{ include "dot_config/nvim/lua/lsp.lua" | sha256sum }}
+# lock:    {{ include "dot_config/nvim/lazy-lock.json" | sha256sum }}
+
+if ! command -v nvim >/dev/null 2>&1; then
+    exit 0
+fi
+
+nvim --headless "+Lazy! sync" +qa

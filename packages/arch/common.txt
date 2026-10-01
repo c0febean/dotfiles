@@ -1,0 +1,7 @@
+# Common terminal tools
+fish
+starship
+vfox
+tmux
+git
+bat

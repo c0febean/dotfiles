@@ -1,0 +1,272 @@
+/*
+ * Tokyo Night GTK3 overlay.
+ *
+ * This is deliberately kept separate from colors.css: colors.css is generated
+ * by the desktop appearance tools and can be regenerated at any time.  Keep
+ * personal GTK changes in this file instead.
+ */
+
+@define-color tokyo_bg #1a1b26;
+@define-color tokyo_bg_dark #16161e;
+@define-color tokyo_bg_highlight #292e42;
+@define-color tokyo_bg_active #3b4261;
+@define-color tokyo_border #3b4261;
+@define-color tokyo_fg #c0caf5;
+@define-color tokyo_fg_muted #a9b1d6;
+@define-color tokyo_fg_dim #565f89;
+@define-color tokyo_blue #7aa2f7;
+@define-color tokyo_cyan #7dcfff;
+@define-color tokyo_green #9ece6a;
+@define-color tokyo_purple #bb9af7;
+@define-color tokyo_orange #ff9e64;
+@define-color tokyo_yellow #e0af68;
+@define-color tokyo_red #f7768e;
+@define-color tokyo_selection #33467c;
+
+* {
+  color: @tokyo_fg;
+}
+
+window,
+.background {
+  background-color: @tokyo_bg;
+  background-image: none;
+  color: @tokyo_fg;
+}
+
+headerbar,
+.titlebar,
+toolbar,
+menubar {
+  background-color: @tokyo_bg_dark;
+  background-image: none;
+  color: @tokyo_fg;
+  border-color: @tokyo_border;
+  box-shadow: none;
+}
+
+headerbar:backdrop,
+.titlebar:backdrop {
+  background-color: @tokyo_bg_dark;
+  color: @tokyo_fg_muted;
+}
+
+button,
+combobox > box > button,
+spinbutton button {
+  background-color: @tokyo_bg_highlight;
+  background-image: none;
+  color: @tokyo_fg;
+  border: 1px solid @tokyo_border;
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+button:hover,
+combobox > box > button:hover,
+spinbutton button:hover {
+  background-color: @tokyo_bg_active;
+  color: @tokyo_fg;
+}
+
+button:active,
+button:checked,
+combobox > box > button:active,
+spinbutton button:active {
+  background-color: @tokyo_selection;
+  color: @tokyo_fg;
+}
+
+button:disabled,
+entry:disabled,
+spinbutton:disabled {
+  background-color: @tokyo_bg_dark;
+  color: @tokyo_fg_dim;
+  border-color: @tokyo_bg_highlight;
+}
+
+entry,
+spinbutton,
+searchbar,
+.search-bar {
+  background-color: @tokyo_bg_dark;
+  background-image: none;
+  color: @tokyo_fg;
+  border: 1px solid @tokyo_border;
+  border-radius: 5px;
+  box-shadow: none;
+  caret-color: @tokyo_cyan;
+}
+
+entry:focus,
+spinbutton:focus,
+searchbar:focus,
+.search-bar:focus {
+  border-color: @tokyo_blue;
+}
+
+view,
+textview,
+treeview,
+iconview,
+flowbox,
+list,
+listbox,
+.view,
+.sidebar,
+.sidebar-pane,
+scrolledwindow {
+  background-color: @tokyo_bg;
+  color: @tokyo_fg;
+}
+
+treeview.view:hover,
+iconview:hover,
+flowboxchild:hover,
+listbox row:hover,
+row:hover {
+  background-color: @tokyo_bg_highlight;
+  color: @tokyo_fg;
+}
+
+treeview.view:selected,
+iconview:selected,
+flowboxchild:selected,
+listbox row:selected,
+row:selected,
+.view:selected {
+  background-color: @tokyo_selection;
+  color: @tokyo_fg;
+}
+
+selection,
+entry selection,
+textview text selection {
+  background-color: @tokyo_selection;
+  color: @tokyo_fg;
+}
+
+menu,
+menubar,
+menuitem,
+popover {
+  background-color: @tokyo_bg_dark;
+  background-image: none;
+  color: @tokyo_fg;
+  border-color: @tokyo_border;
+}
+
+menuitem:hover,
+menuitem:selected,
+popover modelbutton:hover,
+popover modelbutton:selected {
+  background-color: @tokyo_blue;
+  color: @tokyo_bg_dark;
+}
+
+tooltip {
+  background-color: @tokyo_bg_dark;
+  background-image: none;
+  color: @tokyo_fg;
+  border: 1px solid @tokyo_border;
+  border-radius: 5px;
+}
+
+notebook,
+notebook header,
+notebook tabs {
+  background-color: @tokyo_bg_dark;
+  color: @tokyo_fg;
+  border-color: @tokyo_border;
+}
+
+notebook tab {
+  background-color: @tokyo_bg_dark;
+  color: @tokyo_fg_muted;
+  border-color: transparent;
+}
+
+notebook tab:checked {
+  background-color: @tokyo_bg_highlight;
+  color: @tokyo_fg;
+  border-color: @tokyo_blue;
+}
+
+frame > border,
+separator {
+  border-color: @tokyo_border;
+  background-color: @tokyo_border;
+}
+
+scrollbar,
+scrollbar trough {
+  background-color: @tokyo_bg_dark;
+}
+
+scrollbar slider {
+  background-color: @tokyo_border;
+  border-radius: 999px;
+  min-width: 8px;
+  min-height: 8px;
+}
+
+scrollbar slider:hover {
+  background-color: @tokyo_blue;
+}
+
+scale trough,
+progressbar trough {
+  background-color: @tokyo_bg_dark;
+  border: 1px solid @tokyo_border;
+  border-radius: 999px;
+}
+
+scale highlight,
+scale fill,
+progressbar progress {
+  background-color: @tokyo_blue;
+  border-radius: 999px;
+}
+
+scale slider {
+  background-color: @tokyo_blue;
+  border: 1px solid @tokyo_bg_dark;
+  border-radius: 999px;
+}
+
+switch {
+  background-color: @tokyo_bg_highlight;
+  border: 1px solid @tokyo_border;
+}
+
+switch:checked {
+  background-color: @tokyo_green;
+}
+
+switch slider {
+  background-color: @tokyo_fg;
+}
+
+checkbutton check,
+radiobutton radio {
+  background-color: @tokyo_bg_dark;
+  border: 1px solid @tokyo_border;
+}
+
+checkbutton check:checked,
+radiobutton radio:checked {
+  background-color: @tokyo_blue;
+  color: @tokyo_bg_dark;
+}
+
+*:link {
+  color: @tokyo_blue;
+}
+
+*:visited {
+  color: @tokyo_purple;
+}
+
+*:disabled {
+  color: @tokyo_fg_dim;
+}

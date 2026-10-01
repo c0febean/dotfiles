@@ -1,0 +1,160 @@
+[
+  // ============================================================
+  // Main monitor: DP-2
+  // Full status bar
+  // ============================================================
+  {
+    "name": "main",
+    "layer": "top",
+    "output": "DP-2",
+    "position": "top",
+    "height": 34,
+    "spacing": 6,
+
+    "margin-top": 0,
+    "margin-left": 0,
+    "margin-right": 0,
+
+    "reload_style_on_change": true,
+
+    "modules-left": [
+      "hyprland/workspaces#main"
+    ],
+
+    "modules-center": [
+      "hyprland/window"
+    ],
+
+    "modules-right": [
+      "idle_inhibitor",
+      "wireplumber",
+      "network",
+      "cpu",
+      "memory",
+      "custom/notification",
+      "clock",
+      "tray"
+    ],
+
+    "hyprland/workspaces#main": {
+      "active-only": false,
+      "all-outputs": false,
+      "disable-scroll": true,
+      "format": "{name}",
+      "on-click": "activate",
+
+      "persistent-workspaces": {
+        "DP-2": [1, 2, 3]
+      }
+    },
+
+    "hyprland/window": {
+      "format": "{title}",
+      "max-length": 70,
+      "separate-outputs": true
+    },
+
+    "idle_inhibitor": {
+      "format": "{icon}",
+      "format-icons": {
+        "activated": "防休眠",
+        "deactivated": "休眠"
+      }
+    },
+
+    "wireplumber": {
+      "format": "音量 {volume}%",
+      "format-muted": "静音",
+      "on-click": "swaync-client -t -sw",
+      "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+      "scroll-step": 5
+    },
+
+    "network": {
+      "format-wifi": "{essid} {signalStrength}%",
+      "format-ethernet": "有线 {ipaddr}",
+      "format-linked": "{ifname}",
+      "format-disconnected": "网络断开",
+      "tooltip-format": "{ifname}\n{ipaddr}/{cidr}\n网关 {gwaddr}",
+      "on-click": "swaync-client -t -sw",
+      "on-click-right": "nm-connection-editor"
+    },
+
+    "cpu": {
+      "format": "CPU {usage}%",
+      "interval": 3
+    },
+
+    "memory": {
+      "format": "内存 {percentage}%",
+      "interval": 3
+    },
+
+    "custom/notification": {
+      "exec": "swaync-client -c",
+      "interval": 2,
+      "format": "通知 {}",
+      "on-click": "swaync-client -t -sw",
+      "on-click-right": "swaync-client -d -sw",
+      "tooltip": false
+    },
+
+    "clock": {
+      "format": "{:%Y-%m-%d %A %H:%M:%S}",
+      "interval": 1,
+      "tooltip-format": "<big>{:%Y 年 %B}</big>\n<tt>{calendar}</tt>"
+    },
+
+    "tray": {
+      "icon-size": 18,
+      "spacing": 8
+    }
+  },
+
+  // ============================================================
+  // Secondary vertical monitor: DP-3
+  // Minimal status bar
+  // ============================================================
+  {
+    "name": "secondary",
+    "layer": "top",
+    "output": "DP-3",
+    "position": "top",
+    "height": 34,
+    "spacing": 6,
+
+    "margin-top": 0,
+    "margin-left": 0,
+    "margin-right": 0,
+
+    "reload_style_on_change": true,
+
+    "modules-left": [
+      "hyprland/workspaces#secondary"
+    ],
+
+    "modules-center": [],
+
+    "modules-right": [
+      "clock"
+    ],
+
+    "hyprland/workspaces#secondary": {
+      "active-only": false,
+      "all-outputs": false,
+      "disable-scroll": true,
+      "format": "{name}",
+      "on-click": "activate",
+
+      "persistent-workspaces": {
+        "DP-3": [4, 5, 6]
+      }
+    },
+
+    "clock": {
+      "format": "{:%Y-%m-%d %A %H:%M:%S}",
+      "interval": 1,
+      "tooltip-format": "<big>{:%Y 年 %B}</big>\n<tt>{calendar}</tt>"
+    }
+  }
+]

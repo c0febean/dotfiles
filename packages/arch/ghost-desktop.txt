@@ -1,0 +1,27 @@
+# Additional tools used by the main host: ghost
+hyprland
+hypridle
+hyprlock
+hyprpaper
+waybar
+rofi
+swaync
+kitty
+thunar
+fcitx5
+fcitx5-gtk
+fcitx5-qt
+fcitx5-chinese-addons
+fcitx5-configtool
+qt6ct
+nwg-look
+xsettingsd
+wl-clipboard
+cliphist
+hyprshot
+mpvpaper
+networkmanager
+pavucontrol
+polkit
+polkit-gnome
+xdg-desktop-portal-hyprland

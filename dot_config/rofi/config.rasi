@@ -1,0 +1,18 @@
+configuration {
+    modes: "drun";
+    show-icons: true;
+    icon-theme: "breeze-dark";
+    font: "Noto Sans 11";
+    terminal: "konsole";
+
+    display-drun: "Applications";
+    drun-display-format: "{name}";
+    drun-show-actions: false;
+
+    matching: "fuzzy";
+    sort: true;
+    sorting-method: "fzf";
+    case-smart: true;
+}
+
+@theme "tokyo-night"

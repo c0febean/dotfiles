@@ -1,0 +1,663 @@
+#!/usr/bin/env python3
+"""Single-entry prefix launcher for Rofi on Hyprland.
+
+The top-level invocation starts one native Rofi script-mode window. Rofi calls
+this same file back with ROFI_RETV/ROFI_DATA; providers below produce rows and
+handle selections. Add future providers in three places: PROVIDER_META, a
+render_<name>() function registered in RENDERERS, and activate()/handle_custom()
+when the provider needs an action.
+"""
+
+from __future__ import annotations
+
+import base64
+import configparser
+import html
+import json
+import locale
+import os
+import re
+import shutil
+import subprocess
+import sys
+import urllib.parse
+from pathlib import Path
+from typing import Callable, Iterable
+
+
+HOME = Path.home()
+SCRIPT = Path(__file__).resolve()
+UNIT_SEPARATOR = b"\x1f"
+PREFIX_HELP = (
+    "Prefixes: > shell  ·  < windows  ·  = calculator  ·  ?? web  ·  "
+    "/ files  ·  @ ssh"
+)
+
+PROVIDER_META = {
+    "apps": ("", PREFIX_HELP),
+    "shell": (">", "Shell history, or type a command and press Return"),
+    "windows": ("<", "Current windows from Hyprland"),
+    "calc": ("=", "Type an expression; Return evaluates it"),
+    "web-armed": ("?", "Press ? again to activate Web search"),
+    "web": ("??", "Type a query; Return opens it in the default browser"),
+    "files": ("/", "Search visible files under ~"),
+    "ssh": ("@", "Search SSH aliases and hosts; Return opens Konsole"),
+}
+
+HOTKEY_PROVIDERS = {
+    10: "shell",     # >
+    11: "windows",   # <
+    12: "calc",      # =
+    14: "files",     # /
+    15: "ssh",       # @
+}
+
+SKIP_FILE_DIRS = {
+    "node_modules",
+    "__pycache__",
+    "target",
+    "build",
+    "dist",
+    ".cache",
+    ".git",
+    ".local",
+    ".npm",
+    ".cargo",
+    ".rustup",
+    ".venv",
+    "venv",
+}
+
+def clean(value: object) -> str:
+    return str(value).replace("\x00", " ").replace("\r", " ").replace("\n", " ")
+
+
+def emit_header(name: str, value: object) -> None:
+    data = clean(value).encode("utf-8", "replace")
+    sys.stdout.buffer.write(b"\x00" + name.encode() + UNIT_SEPARATOR + data + b"\n")
+
+
+def emit_row(
+    raw: str,
+    display: str,
+    *,
+    icon: str = "",
+    meta: str = "",
+    nonselectable: bool = False,
+) -> None:
+    options: list[bytes] = []
+    for key, value in (("display", display), ("icon", icon), ("meta", meta)):
+        if value:
+            options.extend((key.encode(), clean(value).encode("utf-8", "replace")))
+    if nonselectable:
+        options.extend((b"nonselectable", b"true"))
+
+    line = clean(raw).encode("utf-8", "replace")
+    if options:
+        line += b"\x00" + UNIT_SEPARATOR.join(options)
+    sys.stdout.buffer.write(line + b"\n")
+
+
+def action_token(kind: str, payload: str) -> str:
+    encoded = base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    return f"@{kind}:{encoded}"
+
+
+def searchable_action(kind: str, payload: str, search_text: str) -> str:
+    return f"{action_token(kind, payload)}\t{clean(search_text)}"
+
+
+def decode_action(value: str) -> tuple[str, str] | None:
+    token = value.split("\t", 1)[0]
+    match = re.fullmatch(r"@([a-z-]+):([A-Za-z0-9_-]*)", token)
+    if not match:
+        return None
+    try:
+        encoded = match.group(2)
+        payload = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)).decode()
+    except (ValueError, UnicodeDecodeError):
+        return None
+    return match.group(1), payload
+
+
+def child_environment() -> dict[str, str]:
+    return {key: value for key, value in os.environ.items() if not key.startswith("ROFI_")}
+
+
+def spawn(args: list[str]) -> None:
+    subprocess.Popen(
+        args,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+        close_fds=True,
+        env=child_environment(),
+    )
+
+
+def provider_header(provider: str, message: str | None = None, keep_filter: bool = False) -> None:
+    prompt, default_message = PROVIDER_META[provider]
+    emit_header("prompt", prompt)
+    emit_header("message", html.escape(message or default_message))
+    emit_header("data", provider)
+    emit_header("markup-rows", "false")
+    emit_header("no-custom", "false")
+    emit_header("use-hot-keys", "true")
+    if keep_filter:
+        emit_header("keep-filter", "true")
+
+
+def locale_candidates() -> list[str]:
+    values: list[str] = []
+    for variable in ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"):
+        raw = os.environ.get(variable, "")
+        for item in raw.split(":"):
+            item = item.split(".", 1)[0].split("@", 1)[0]
+            if item and item not in {"C", "POSIX"}:
+                values.extend((item, item.split("_", 1)[0]))
+    try:
+        current = locale.getlocale()[0]
+        if current:
+            values.extend((current, current.split("_", 1)[0]))
+    except ValueError:
+        pass
+    return list(dict.fromkeys(values))
+
+
+def localized(section: configparser.SectionProxy, key: str) -> str:
+    for language in locale_candidates():
+        value = section.get(f"{key}[{language}]", "").strip()
+        if value:
+            return value
+    return section.get(key, "").strip()
+
+
+def desktop_directories() -> list[Path]:
+    data_home = Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share"))
+    data_dirs = os.environ.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share").split(":")
+    return [data_home / "applications", *(Path(item) / "applications" for item in data_dirs if item)]
+
+
+def desktop_entries() -> Iterable[tuple[str, str, str, str]]:
+    seen: set[str] = set()
+    current_desktops = {
+        item.casefold()
+        for item in os.environ.get("XDG_CURRENT_DESKTOP", "Hyprland").split(":")
+        if item
+    }
+
+    for directory in desktop_directories():
+        if not directory.is_dir():
+            continue
+        try:
+            paths = sorted(directory.rglob("*.desktop"))
+        except OSError:
+            continue
+        for path in paths:
+            relative = path.relative_to(directory).as_posix()
+            desktop_id = relative[:-8].replace("/", "-")
+            if desktop_id in seen:
+                continue
+            seen.add(desktop_id)
+
+            parser = configparser.ConfigParser(interpolation=None, strict=False)
+            parser.optionxform = str
+            try:
+                with path.open("r", encoding="utf-8", errors="replace") as handle:
+                    parser.read_file(handle)
+                section = parser["Desktop Entry"]
+            except (OSError, KeyError, configparser.Error):
+                continue
+
+            if section.get("Type", "Application") != "Application":
+                continue
+            if section.get("Hidden", "false").casefold() == "true":
+                continue
+            if section.get("NoDisplay", "false").casefold() == "true":
+                continue
+
+            only_show = {item.casefold() for item in section.get("OnlyShowIn", "").split(";") if item}
+            not_show = {item.casefold() for item in section.get("NotShowIn", "").split(";") if item}
+            if only_show and current_desktops.isdisjoint(only_show):
+                continue
+            if current_desktops.intersection(not_show):
+                continue
+
+            try_exec = section.get("TryExec", "").strip()
+            if try_exec:
+                available = Path(try_exec).exists() if "/" in try_exec else shutil.which(try_exec)
+                if not available:
+                    continue
+
+            name = localized(section, "Name")
+            if not name:
+                continue
+            icon = section.get("Icon", "application-x-executable").strip()
+            metadata = " ".join(
+                filter(
+                    None,
+                    (
+                        name,
+                        localized(section, "GenericName"),
+                        localized(section, "Comment"),
+                        section.get("Keywords", "").replace(";", " "),
+                        section.get("Exec", ""),
+                        desktop_id,
+                    ),
+                )
+            )
+            yield name, desktop_id, icon, metadata
+
+
+def render_apps(message: str | None = None, keep_filter: bool = False) -> None:
+    provider_header("apps", message, keep_filter)
+    entries = sorted(desktop_entries(), key=lambda item: item[0].casefold())
+    for name, desktop_id, icon, metadata in entries:
+        emit_row(
+            searchable_action("app", desktop_id, metadata),
+            name,
+            icon=icon,
+            meta=metadata,
+        )
+
+    hints = (
+        ("shell", ">  Shell command", "utilities-terminal"),
+        ("windows", "<  Hyprland windows", "preferences-system-windows"),
+        ("calc", "=  Calculator", "accessories-calculator"),
+        ("web", "??  Web search", "web-browser"),
+        ("files", "/  File search", "system-file-manager"),
+        ("ssh", "@  SSH hosts", "network-server"),
+    )
+    for provider, label, icon in hints:
+        emit_row(
+            searchable_action("provider", provider, label),
+            label,
+            icon=icon,
+            meta=f"{label} provider prefix",
+        )
+
+
+def hyprland_windows() -> list[dict[str, object]]:
+    try:
+        result = subprocess.run(
+            ["hyprctl", "clients", "-j"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            env=child_environment(),
+            check=False,
+        )
+        clients = json.loads(result.stdout)
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        return []
+    return [item for item in clients if item.get("mapped", True)]
+
+
+def render_windows(message: str | None = None, keep_filter: bool = False) -> None:
+    provider_header("windows", message, keep_filter)
+    windows = sorted(hyprland_windows(), key=lambda item: int(item.get("focusHistoryID", 999999)))
+    if not windows:
+        emit_row("window-help", "No Hyprland windows found", nonselectable=True)
+        return
+    for window in windows:
+        address = str(window.get("address", ""))
+        title = clean(window.get("title") or window.get("class") or "Untitled")
+        class_name = clean(window.get("class") or window.get("initialClass") or "application")
+        workspace = window.get("workspace") or {}
+        workspace_name = clean(workspace.get("name", "?")) if isinstance(workspace, dict) else "?"
+        display = f"<  {title}  ·  {class_name}  ·  workspace {workspace_name}"
+        meta = f"< {title} {class_name} {window.get('initialClass', '')} workspace {workspace_name}"
+        emit_row(
+            searchable_action("window", address, meta),
+            display,
+            icon=class_name,
+            meta=meta,
+        )
+
+
+def history_commands() -> list[str]:
+    candidates = []
+    if os.environ.get("HISTFILE"):
+        candidates.append(Path(os.environ["HISTFILE"]).expanduser())
+    candidates.extend((HOME / ".zsh_history", HOME / ".bash_history"))
+
+    commands: list[str] = []
+    for path in dict.fromkeys(candidates):
+        try:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        for line in reversed(lines):
+            line = re.sub(r"^: \d+:\d+;", "", line).strip()
+            if line:
+                commands.append(line)
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for command in commands:
+        if command not in seen:
+            seen.add(command)
+            unique.append(command)
+        if len(unique) >= 500:
+            break
+    return unique
+
+
+def render_shell(message: str | None = None, keep_filter: bool = False) -> None:
+    provider_header("shell", message, keep_filter)
+    commands = history_commands()
+    for command in commands:
+        emit_row(
+            searchable_action("shell", command, f"> {command}"),
+            f">  {command}",
+            icon="utilities-terminal",
+            meta=f"> {command}",
+        )
+    if not commands:
+        emit_row("shell-help", "Type a shell command and press Return", nonselectable=True)
+
+
+def render_calc(message: str | None = None, keep_filter: bool = False) -> None:
+    provider_header("calc", message, keep_filter)
+    emit_row("calc-help", "Enter a mathematical expression", icon="accessories-calculator", nonselectable=True)
+
+
+def render_calc_result(expression: str, result: str) -> None:
+    provider_header("calc", "Return copies the result to the clipboard")
+    emit_row(
+        searchable_action("copy", result, f"= {expression} {result}"),
+        f"=  {expression}  →  {result}",
+        icon="accessories-calculator",
+        meta=f"= {expression} {result}",
+    )
+
+
+def render_web_armed(message: str | None = None, keep_filter: bool = False) -> None:
+    provider_header("web-armed", message, keep_filter)
+    emit_row("web-armed-help", "Press ? once more", icon="web-browser", nonselectable=True)
+
+
+def render_web(message: str | None = None, keep_filter: bool = False) -> None:
+    provider_header("web", message, keep_filter)
+    emit_row("web-help", "Enter a Web search query", icon="web-browser", nonselectable=True)
+
+
+def visible_files(limit: int = 20000) -> Iterable[Path]:
+    count = 0
+    for root, directories, files in os.walk(HOME, topdown=True, followlinks=False):
+        directories[:] = sorted(
+            name
+            for name in directories
+            if not name.startswith(".") and name not in SKIP_FILE_DIRS
+        )
+        for name in sorted(files):
+            if name.startswith("."):
+                continue
+            yield Path(root) / name
+            count += 1
+            if count >= limit:
+                return
+
+
+def render_files(message: str | None = None, keep_filter: bool = False) -> None:
+    provider_header("files", message, keep_filter)
+    found = False
+    for path in visible_files():
+        found = True
+        relative = path.relative_to(HOME)
+        label = f"~/{relative}"
+        search_text = f"/ {label} {path.name}"
+        emit_row(
+            searchable_action("file", str(path), search_text),
+            f"/  {label}",
+            icon="text-x-generic",
+            meta=search_text,
+        )
+    if not found:
+        emit_row("file-help", "No searchable files found", nonselectable=True)
+
+
+def ssh_hosts() -> list[str]:
+    hosts: list[str] = []
+    config_path = HOME / ".ssh/config"
+    try:
+        for line in config_path.read_text(encoding="utf-8", errors="replace").splitlines():
+            match = re.match(r"\s*Host\s+(.+)$", line, re.IGNORECASE)
+            if not match:
+                continue
+            for host in match.group(1).split():
+                if not any(character in host for character in "*?!"):
+                    hosts.append(host)
+    except OSError:
+        pass
+
+    known_hosts_path = HOME / ".ssh/known_hosts"
+    try:
+        for line in known_hosts_path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not line or line.startswith("#") or line.startswith("|"):
+                continue
+            fields = line.split()
+            if not fields:
+                continue
+            host_field = fields[1] if fields[0].startswith("@") and len(fields) > 1 else fields[0]
+            for host in host_field.split(","):
+                if host.startswith("|"):
+                    continue
+                bracketed = re.fullmatch(r"\[([^]]+)\]:(\d+)", host)
+                hosts.append(bracketed.group(1) if bracketed else host)
+    except OSError:
+        pass
+
+    return sorted(dict.fromkeys(hosts), key=str.casefold)
+
+
+def render_ssh(message: str | None = None, keep_filter: bool = False) -> None:
+    provider_header("ssh", message, keep_filter)
+    hosts = ssh_hosts()
+    for host in hosts:
+        search_text = f"@ {host}"
+        emit_row(
+            searchable_action("ssh", host, search_text),
+            f"@  {host}",
+            icon="network-server",
+            meta=search_text,
+        )
+    if not hosts:
+        emit_row("ssh-help", "No indexed hosts; type a hostname and press Return", nonselectable=True)
+
+
+RENDERERS: dict[str, Callable[[str | None, bool], None]] = {
+    "apps": render_apps,
+    "shell": render_shell,
+    "windows": render_windows,
+    "calc": render_calc,
+    "web-armed": render_web_armed,
+    "web": render_web,
+    "files": render_files,
+    "ssh": render_ssh,
+}
+
+
+def render_provider(provider: str, message: str | None = None, keep_filter: bool = False) -> None:
+    RENDERERS.get(provider, render_apps)(message, keep_filter)
+
+
+def evaluate(expression: str) -> None:
+    expression = expression.strip()
+    if not expression:
+        render_calc()
+        return
+    try:
+        result = subprocess.run(
+            ["qalc", "-t", expression],
+            capture_output=True,
+            text=True,
+            timeout=4,
+            check=False,
+            env=child_environment(),
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        render_calc(f"Calculation failed: {error}")
+        return
+    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    answer = lines[-1] if lines else ""
+    if result.returncode != 0 or not answer or answer.casefold().startswith("error"):
+        detail = (result.stderr or result.stdout or "Invalid expression").strip().splitlines()[-1]
+        render_calc(f"Calculation failed: {detail}")
+        return
+    render_calc_result(expression, answer)
+
+
+def web_search(query: str) -> None:
+    query = query.strip()
+    if not query:
+        render_web()
+        return
+    url = "https://www.google.com/search?" + urllib.parse.urlencode({"q": query})
+    spawn(["xdg-open", url])
+
+
+def open_ssh(host: str) -> bool:
+    host = host.strip()
+    if not re.fullmatch(r"[A-Za-z0-9_.:@%+\-\[\]]+", host):
+        render_ssh("Invalid SSH hostname")
+        return False
+    spawn(["konsole", "-e", "ssh", host])
+    return True
+
+
+def activate(kind: str, payload: str) -> None:
+    if kind == "provider":
+        render_provider(payload)
+    elif kind == "app":
+        spawn(["gtk-launch", payload])
+    elif kind == "shell":
+        shell = os.environ.get("SHELL") or "/bin/sh"
+        spawn([shell, "-lc", payload])
+    elif kind == "window" and re.fullmatch(r"0x[0-9A-Fa-f]+", payload):
+        expression = f'hl.dsp.focus({{ window = "address:{payload}" }})'
+        subprocess.run(
+            ["hyprctl", "dispatch", expression],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=3,
+            check=False,
+            env=child_environment(),
+        )
+    elif kind == "file":
+        path = Path(payload).expanduser()
+        if path.is_file():
+            spawn(["xdg-open", str(path)])
+        else:
+            render_files("The selected file no longer exists")
+    elif kind == "ssh":
+        open_ssh(payload)
+    elif kind == "copy":
+        subprocess.run(
+            ["wl-copy"],
+            input=payload,
+            text=True,
+            timeout=3,
+            check=False,
+            env=child_environment(),
+        )
+
+
+def handle_custom(provider: str, text: str) -> None:
+    text = text.strip()
+    if provider == "shell":
+        if text:
+            activate("shell", text)
+        else:
+            render_shell()
+    elif provider == "windows":
+        render_windows("Select a matching Hyprland window", keep_filter=True)
+    elif provider == "calc":
+        evaluate(text)
+    elif provider == "web":
+        web_search(text)
+    elif provider == "web-armed":
+        render_web_armed()
+    elif provider == "files":
+        render_files("Select a matching file", keep_filter=True)
+    elif provider == "ssh":
+        if text:
+            open_ssh(text)
+        else:
+            render_ssh()
+    else:
+        # Fallback for pasted prefixes, which bypass Rofi's symbol keybindings.
+        if text.startswith("??"):
+            web_search(text[2:])
+        elif text.startswith(">"):
+            command = text[1:].strip()
+            activate("shell", command) if command else render_shell()
+        elif text.startswith("<"):
+            render_windows(keep_filter=True)
+        elif text.startswith("="):
+            evaluate(text[1:])
+        elif text.startswith("/"):
+            render_files(keep_filter=True)
+        elif text.startswith("@"):
+            host = text[1:].strip()
+            open_ssh(host) if host else render_ssh()
+        else:
+            render_apps("Select a desktop application", keep_filter=True)
+
+
+def callback_main() -> None:
+    try:
+        return_value = int(os.environ.get("ROFI_RETV", "0"))
+    except ValueError:
+        return_value = 0
+    provider = os.environ.get("ROFI_DATA", "apps")
+    selected = sys.argv[1] if len(sys.argv) > 1 else ""
+
+    if return_value == 0:
+        render_apps()
+    elif return_value in HOTKEY_PROVIDERS:
+        render_provider(HOTKEY_PROVIDERS[return_value])
+    elif return_value == 13:
+        render_provider("web" if provider == "web-armed" else "web-armed")
+    elif return_value == 1:
+        action = decode_action(selected)
+        if action:
+            activate(*action)
+        else:
+            render_provider(provider, "Choose a listed result or enter a custom value")
+    elif return_value == 2:
+        handle_custom(provider, selected)
+    else:
+        render_provider(provider)
+
+
+def launcher_main() -> None:
+    command = [
+        "rofi",
+        "-show",
+        "launcher",
+        "-modes",
+        f"launcher:{SCRIPT}",
+        "-show-icons",
+        "-kb-custom-1",
+        "greater",
+        "-kb-custom-2",
+        "less",
+        "-kb-custom-3",
+        "equal",
+        "-kb-custom-4",
+        "question",
+        "-kb-custom-5",
+        "slash",
+        "-kb-custom-6",
+        "at",
+    ]
+    os.execvp(command[0], command)
+
+
+if __name__ == "__main__":
+    if "ROFI_RETV" in os.environ:
+        callback_main()
+    else:
+        launcher_main()
