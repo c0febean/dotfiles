@@ -60,6 +60,7 @@ hl.env("HYPRSHOT_DIR", home .. "/media/screenshots")
 hl.config({
     input = {
         kb_layout = "us",
+        -- Mouse focus follows the pointer without moving the scrolling view.
         follow_mouse = 1,
         sensitivity = 0,
         numlock_by_default = true,
@@ -95,11 +96,23 @@ hl.config({
         },
     },
     scrolling = {
-        column_width = 0.85,
+        -- Keep the focused column large while reducing each side preview to
+        -- roughly half of the previous width.
+        column_width = 0.90,
+        -- Native fit handles edges. scrolling-view.lua explicitly centers
+        -- interior columns after Hyprland finishes processing an event.
         focus_fit_method = 1,
-        follow_focus = true,
+        -- Follow keyboard/click focus, but ignore soft mouse focus changes.
+        -- The helper applies the same distinction when centering columns.
+        follow_focus = false,
         fullscreen_on_one_column = true,
         wrap_focus = true,
+    },
+    master = {
+        -- Keep the master window above a horizontally split slave area on DP-3.
+        orientation = "top",
+        mfact = 0.3,
+        new_status = "slave",
     },
     decoration = {
         rounding = 8,
@@ -168,9 +181,11 @@ for i = 4, 6 do
         monitor = "DP-3",
         persistent = true,
         default = i == 6,
-        layout = "scrolling",
+        layout = "master",
     })
 end
+
+dofile(home .. "/.config/hypr/scrolling-view.lua")(hl)
 
 ----------------
 -- Key bindings
@@ -208,7 +223,7 @@ for key, direction in pairs(directions) do
     hl.bind(super .. " + SHIFT + " .. key, hl.dsp.window.move({ direction = direction }))
 end
 
-for i = 1, 9 do
+for i = 1, 6 do
     hl.bind(super .. " + " .. i, hl.dsp.focus({ workspace = i }))
     hl.bind(super .. " + SHIFT + " .. i, hl.dsp.window.move({ workspace = i }))
 end
@@ -234,7 +249,6 @@ hl.on("hyprland.start", function()
 
     hl.exec_cmd("waybar")
     hl.exec_cmd("pidof nm-applet >/dev/null || nm-applet --indicator")
-    hl.exec_cmd("swaync")
     -- hl.exec_cmd("hyprpaper")
     hl.exec_cmd("hypridle")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
@@ -251,6 +265,15 @@ end)
 ----------------
 -- Conservative window rules
 ----------------
+
+-- Tiled windows receive a maximized state to suppress client-side titlebar
+-- decorations. Some clients echo that state back as a real maximize request;
+-- ignore those requests so scrolling columns remain navigable.
+hl.window_rule({
+    name = "suppress-maximize-events",
+    match = { class = ".*" },
+    suppress_event = "maximize",
+})
 
 hl.window_rule({
     name = "picture-in-picture",
