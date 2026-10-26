@@ -12,14 +12,18 @@ local wallpaper = "/usr/share/wallpapers/Next/contents/images_dark/5120x2880.png
 ----------------
 
 -- Keep the geometry already used by KDE. Transform 1 is 90 degrees clockwise.
-hl.monitor({
+local secondaryMonitor = {
     output = "DP-3",
     mode = "2560x1440@144",
     position = "0x0",
     scale = 1,
     transform = 1,
     vrr = 0,
-})
+    reserved = 0,
+}
+hl.monitor(secondaryMonitor)
+
+local secondaryColumnWidth = 0.94
 
 hl.monitor({
     output = "DP-2",
@@ -108,12 +112,6 @@ hl.config({
         fullscreen_on_one_column = true,
         wrap_focus = true,
     },
-    master = {
-        -- Keep the master window above a horizontally split slave area on DP-3.
-        orientation = "top",
-        mfact = 0.3,
-        new_status = "slave",
-    },
     decoration = {
         rounding = 8,
         rounding_power = 2,
@@ -181,11 +179,17 @@ for i = 4, 6 do
         monitor = "DP-3",
         persistent = true,
         default = i == 6,
-        layout = "master",
+        layout = "scrolling",
     })
 end
 
 dofile(home .. "/.config/hypr/scrolling-view.lua")(hl)
+local secondary = dofile(home .. "/.config/hypr/secondary-layout.lua")(hl, {
+    monitor = secondaryMonitor,
+    top_fraction = 0.30,
+    column_width = secondaryColumnWidth,
+    gap = 6,
+})
 
 ----------------
 -- Key bindings
@@ -198,8 +202,10 @@ hl.bind(super .. " + RETURN", hl.dsp.exec_cmd(terminal))
 hl.bind(super .. " + D", hl.dsp.exec_cmd(launcher))
 hl.bind(super .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(super .. " + Q", hl.dsp.window.close())
-hl.bind(super .. " + F", hl.dsp.window.fullscreen({ action = "toggle" }))
-hl.bind(super .. " + SPACE", hl.dsp.window.float({ action = "toggle" }))
+hl.bind(super .. " + F", secondary.unfixed(hl.dsp.window.fullscreen({ action = "toggle" })))
+hl.bind(super .. " + SPACE", secondary.unfixed(hl.dsp.window.float({ action = "toggle" })))
+-- Optional override alongside automatic arrivals/drop: pin, replace, or unpin on DP-3.
+hl.bind(super .. " + P", secondary.toggle_pin)
 -- Clipboard history: use the same Rofi stack as the main launcher.
 -- Keep the current clipboard when the picker is cancelled or returns empty.
 hl.bind(super .. " + V", hl.dsp.exec_cmd("choice=$(cliphist list | rofi -dmenu -i -config " .. home .. "/.config/rofi/config.rasi -p Clipboard) && [ -n \"$choice\" ] && printf '%s\\n' \"$choice\" | cliphist decode | wl-copy"))
@@ -219,18 +225,18 @@ local directions = {
 }
 
 for key, direction in pairs(directions) do
-    hl.bind(super .. " + " .. key, hl.dsp.focus({ direction = direction }))
-    hl.bind(super .. " + SHIFT + " .. key, hl.dsp.window.move({ direction = direction }))
+    hl.bind(super .. " + " .. key, function() secondary.focus(direction) end)
+    hl.bind(super .. " + SHIFT + " .. key, function() secondary.move(direction) end)
 end
 
 for i = 1, 6 do
     hl.bind(super .. " + " .. i, hl.dsp.focus({ workspace = i }))
-    hl.bind(super .. " + SHIFT + " .. i, hl.dsp.window.move({ workspace = i }))
+    hl.bind(super .. " + SHIFT + " .. i, secondary.unfixed(hl.dsp.window.move({ workspace = i })))
 end
 
 -- Mouse movement remains first-class: drag with Super + left button, resize with right.
-hl.bind(super .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
-hl.bind(super .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+hl.bind(super .. " + mouse:272", secondary.unfixed(hl.dsp.window.drag()), { mouse = true })
+hl.bind(super .. " + mouse:273", secondary.unfixed(hl.dsp.window.resize()), { mouse = true })
 
 -- PipeWire controls; these do not replace the existing audio stack.
 hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true })

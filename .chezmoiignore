@@ -3,6 +3,7 @@
 .gitignore
 docs/
 packages/
+tests/
 private/
 
 # Empty workspace folders that are not part of the home directory state.
